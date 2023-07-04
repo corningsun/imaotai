@@ -1,5 +1,7 @@
 import logging
+import random
 import sys
+import time
 
 import config
 import login
@@ -52,6 +54,9 @@ for section in configs.sections():
             reservation_params = process.act_params(max_shop_id, item)
             process.reservation(reservation_params, mobile)
             process.getUserEnergyAward(mobile)
+            time.sleep(random.randint(5, 20))
+
     except BaseException as e:
-        print(e)
         logging.error(e)
+
+    time.sleep(random.randint(30, 120))
