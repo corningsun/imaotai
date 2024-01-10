@@ -15,13 +15,23 @@ AES_KEY = 'qbhajinldepmucsonaaaccgypwuvcjaa'
 AES_IV = '2018534749963515'
 SALT = '2af72f100c356273d46284f6fd1dfc08'
 
-AMAP_KEY = '9449339b6c4aee04d69481e6e6c84a84'
 
 CURRENT_TIME = str(int(time.time() * 1000))
 headers = {}
-mt_version = "".join(re.findall('new__latest__version">(.*?)</p>',
-                                requests.get('https://apps.apple.com/cn/app/i%E8%8C%85%E5%8F%B0/id1600482450').text,
-                                re.S)).replace('版本 ', '')
+
+
+def getMtVersion():
+
+    appStoreHtmlResponse = requests.get('https://apps.apple.com/cn/app/i%E8%8C%85%E5%8F%B0/id1600482450')
+    appStoreHtmlResponse.encoding='UTF-8'
+
+    mt_version = "".join(re.findall('new__latest__version">(.*?)</p>',
+                                    appStoreHtmlResponse.text,
+                                    re.S)).replace('版本 ', '')
+    return mt_version
+
+
+mt_version= getMtVersion()
 
 header_context = f'''
 MT-Lat: 28.499562
@@ -211,31 +221,33 @@ def act_params(shop_id: str, item_id: str):
     return params
 
 
-def send_email(msg: str):
+def send_email(title: str, msg: str):
     if config.PUSH_TOKEN is None:
         return
-    title = 'imoutai预约失败'  # 改成你要的标题内容
-    content = msg  # 改成你要的正文内容
-    url = 'http://www.pushplus.plus/send'
-    r = requests.get(url, params={'token': config.PUSH_TOKEN,
-                                  'title': title,
-                                  'content': content})
-    logging.info(f'通知推送结果：{r.status_code, r.text}')
+    if config.PUSH_TOKEN == 'FeiShu':
+        content = title + '\n' + msg  # 改成你要的正文内容
+        url = config.PUSH_FEISHU_URL
+        data = {'msg_type': "text", 'content': {'text': content}}
+        r = requests.post(url, data= json.dumps(data))
+        logging.info(f'通知推送结果：{r.status_code, r.text}')
 
 
 def reservation(params: dict, mobile: str):
     params.pop('userId')
     responses = requests.post("https://app.moutai519.com.cn/xhr/front/mall/reservation/add", json=params,
                               headers=headers)
-    if responses.status_code == 401:
-        send_email(f'[{mobile}],登录token失效，需要重新登录')
-        raise RuntimeError
     logging.info(
         f'预约 : mobile:{mobile} :  response code : {responses.status_code}, response body : {responses.text}')
 
+    if responses.status_code == 401:
+        send_email('imoutai预约失败', f'[{mobile}],登录token失效，需要重新登录')
+        raise RuntimeError
+    else:
+        send_email('imoutai预约成功', f'[{mobile}], response body : {responses.text}')
+
 
 def select_geo(i: str):
-    resp = requests.get(f"https://restapi.amap.com/v3/geocode/geo?key={AMAP_KEY}&output=json&address={i}")
+    resp = requests.get(f"https://restapi.amap.com/v3/geocode/geo?key={config.AMAP_KEY}&output=json&address={i}")
     geocodes: list = resp.json()['geocodes']
     return geocodes
 
